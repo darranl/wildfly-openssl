@@ -161,10 +161,23 @@ jobs:
       # 4. Build wildfly-openssl Java code with Java 25
       # Note: Native libraries (libwfssl) come from pre-built Maven artifacts (wildfly-openssl-natives)
       - name: Build with Java 25
+        id: build
         shell: bash
         run: |
           export JAVA_HOME="${JAVA_HOME_25_TEMURIN}"
-          mvn clean install -DskipTests -B -V
+          mvn clean install -DskipTests -B -V 2>&1 | tee build.log
+      
+      - name: Upload build logs on failure
+        if: failure() && steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-ubuntu-latest
+          path: |
+            build.log
+            **/target/maven-status/**
+            **/target/*.log
+          retention-days: 30
+          if-no-files-found: warn
       
       # 5. Run tests with Java 17 (Temurin)
       - name: Test with Java 17 (Temurin)
@@ -184,12 +197,16 @@ jobs:
           comment_mode: off
       
       - name: Upload test results - Java 17 (Temurin)
-        if: failure()
+        if: always() && steps.test-java17-temurin.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-java17-temurin-ubuntu-latest
-          path: '**/target/surefire-reports/**'
+          path: |
+            **/target/surefire-reports/**
+            **/target/*.log
+            **/target/test-classes/**/*.log
           retention-days: 30
+          if-no-files-found: warn
       
       # 6. Run tests with Java 17 (Semeru)
       - name: Test with Java 17 (Semeru)
@@ -209,12 +226,16 @@ jobs:
           comment_mode: off
       
       - name: Upload test results - Java 17 (Semeru)
-        if: failure()
+        if: always() && steps.test-java17-semeru.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-java17-semeru-ubuntu-latest
-          path: '**/target/surefire-reports/**'
+          path: |
+            **/target/surefire-reports/**
+            **/target/*.log
+            **/target/test-classes/**/*.log
           retention-days: 30
+          if-no-files-found: warn
       
       # 7. Run tests with Java 21 (Temurin)
       - name: Test with Java 21 (Temurin)
@@ -234,12 +255,16 @@ jobs:
           comment_mode: off
       
       - name: Upload test results - Java 21 (Temurin)
-        if: failure()
+        if: always() && steps.test-java21-temurin.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-java21-temurin-ubuntu-latest
-          path: '**/target/surefire-reports/**'
+          path: |
+            **/target/surefire-reports/**
+            **/target/*.log
+            **/target/test-classes/**/*.log
           retention-days: 30
+          if-no-files-found: warn
       
       # 8. Run tests with Java 21 (Semeru)
       - name: Test with Java 21 (Semeru)
@@ -259,12 +284,16 @@ jobs:
           comment_mode: off
       
       - name: Upload test results - Java 21 (Semeru)
-        if: failure()
+        if: always() && steps.test-java21-semeru.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-java21-semeru-ubuntu-latest
-          path: '**/target/surefire-reports/**'
+          path: |
+            **/target/surefire-reports/**
+            **/target/*.log
+            **/target/test-classes/**/*.log
           retention-days: 30
+          if-no-files-found: warn
       
       # 9. Run tests with Java 25 (Temurin)
       - name: Test with Java 25 (Temurin)
@@ -284,12 +313,16 @@ jobs:
           comment_mode: off
       
       - name: Upload test results - Java 25 (Temurin)
-        if: failure()
+        if: always() && steps.test-java25-temurin.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-java25-temurin-ubuntu-latest
-          path: '**/target/surefire-reports/**'
+          path: |
+            **/target/surefire-reports/**
+            **/target/*.log
+            **/target/test-classes/**/*.log
           retention-days: 30
+          if-no-files-found: warn
       
       # 10. Run tests with Java 25 (Semeru)
       - name: Test with Java 25 (Semeru)
@@ -309,12 +342,16 @@ jobs:
           comment_mode: off
       
       - name: Upload test results - Java 25 (Semeru)
-        if: failure()
+        if: always() && steps.test-java25-semeru.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: test-results-java25-semeru-ubuntu-latest
-          path: '**/target/surefire-reports/**'
+          path: |
+            **/target/surefire-reports/**
+            **/target/*.log
+            **/target/test-classes/**/*.log
           retention-days: 30
+          if-no-files-found: warn
       
       # 11. Check for test failures and fail job if any occurred
       - name: Check test results
