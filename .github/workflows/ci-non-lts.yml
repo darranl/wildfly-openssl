@@ -1,0 +1,184 @@
+name: CI - Non-LTS Testing
+
+on:
+  schedule:
+    # Run nightly at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      enabled:
+        description: 'Enable non-LTS testing'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  test-non-lts:
+    name: Test - Java 26 - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    # Allow disabling via workflow_dispatch
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.enabled == 'true' }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            vcvars: C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+            openssl_home: C:\Program Files\OpenSSL-Win64
+    
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # 2. Install JDK 26 for building and testing
+      - name: Set up JDK 26 (Temurin) - Build
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '26'
+      
+      - name: Capture JDK 26 path
+        shell: bash
+        run: |
+          echo "JAVA_HOME_26_TEMURIN=$JAVA_HOME" >> $GITHUB_ENV
+      
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      
+      # 3. Platform-specific OpenSSL setup
+      - name: OpenSSL Library Version Info (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: openssl version -v
+      
+      - name: OpenSSL Library Version Info (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
+          openssl version
+      
+      - name: Install OpenSSL 3 on Windows
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          vcpkg install openssl:x64-windows-static-md
+      
+      # 4. Generate toolchains.xml
+      - name: Generate toolchains.xml
+        shell: bash
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/toolchains.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <toolchains xmlns="http://maven.apache.org/TOOLCHAINS/1.1.0"
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xsi:schemaLocation="http://maven.apache.org/TOOLCHAINS/1.1.0
+                                          http://maven.apache.org/xsd/toolchains-1.1.0.xsd">
+            <toolchain>
+              <type>jdk</type>
+              <provides>
+                <version>26</version>
+                <vendor>temurin</vendor>
+              </provides>
+              <configuration>
+                <jdkHome>${env.JAVA_HOME_26_TEMURIN}</jdkHome>
+              </configuration>
+            </toolchain>
+          </toolchains>
+          EOF
+          
+          # Expand environment variables
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Windows: Use PowerShell for variable expansion
+            powershell -Command "\$content = Get-Content ~/.m2/toolchains.xml -Raw; \$content = \$content -replace '\\\$\{env\.JAVA_HOME_26_TEMURIN\}', \$env:JAVA_HOME_26_TEMURIN; \$content | Set-Content ~/.m2/toolchains.xml -NoNewline"
+          else
+            # Linux/macOS: Use envsubst
+            envsubst < ~/.m2/toolchains.xml > ~/.m2/toolchains.xml.tmp
+            mv ~/.m2/toolchains.xml.tmp ~/.m2/toolchains.xml
+          fi
+      
+      # 5. Build with Java 26 (platform-specific)
+      - name: Build with Java 26 (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          export JAVA_HOME="${JAVA_HOME_26_TEMURIN}"
+          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+      
+      - name: Build with Java 26 (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          export JAVA_HOME="${JAVA_HOME_26_TEMURIN}"
+          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
+          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
+      
+      - name: Build with Java 26 (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          VCVARS: ${{ matrix.vcvars }}
+          OPENSSL_HOME: ${{ matrix.openssl_home }}
+        shell: cmd
+        run: |
+          call "%VCVARS%" x64
+          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
+          set JAVA_HOME=%JAVA_HOME_26_TEMURIN%
+          mvn clean install -DskipTests -B -V
+      
+      # 6. Test with Java 26 (platform-specific)
+      - name: Test with Java 26 (Temurin) - Linux
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+        continue-on-error: true
+      
+      - name: Test with Java 26 (Temurin) - macOS
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
+          mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
+        continue-on-error: true
+      
+      - name: Test with Java 26 (Temurin) - Windows
+        if: matrix.os == 'windows-latest'
+        env:
+          VCVARS: ${{ matrix.vcvars }}
+        shell: cmd
+        timeout-minutes: 30
+        run: |
+          call "%VCVARS%" x64
+          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
+          mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B
+        continue-on-error: true
+      
+      - name: Publish test results - Java 26 (Temurin) - ${{ matrix.os }}
+        if: always() && runner.os == 'Linux'
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: '**/target/surefire-reports/TEST-*.xml'
+          check_name: 'Test Results - Java 26 (Temurin) - ${{ matrix.os }}'
+          comment_mode: off
+      
+      - name: Upload test results - Java 26 (Temurin) - ${{ matrix.os }}
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-java26-temurin-${{ matrix.os }}
+          path: '**/target/surefire-reports/**'
+          retention-days: 30
