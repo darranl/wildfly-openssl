@@ -84,11 +84,7 @@ jobs:
         shell: bash
         run: echo "JAVA_HOME_25_SEMERU=$JAVA_HOME" >> $GITHUB_ENV
       
-      # 3. OpenSSL setup for Linux
-      - name: OpenSSL Library Version Info
-        run: openssl version -v
-      
-      # 4. Generate toolchains.xml
+      # 3. Generate toolchains.xml
       - name: Generate toolchains.xml
         shell: bash
         run: |
@@ -162,20 +158,21 @@ jobs:
           </toolchains>
           EOF
       
-      # 5. Build once with Java 25
+      # 4. Build wildfly-openssl Java code with Java 25
+      # Note: Native libraries (libwfssl) come from pre-built Maven artifacts (wildfly-openssl-natives)
       - name: Build with Java 25
         shell: bash
         run: |
           export JAVA_HOME="${JAVA_HOME_25_TEMURIN}"
-          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn clean install -DskipTests -B -V
       
-      # 6. Run tests with Java 17 (Temurin)
+      # 5. Run tests with Java 17 (Temurin)
       - name: Test with Java 17 (Temurin)
         id: test-java17-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       
       - name: Publish test results - Java 17 (Temurin)
@@ -194,13 +191,13 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 7. Run tests with Java 17 (Semeru)
+      # 6. Run tests with Java 17 (Semeru)
       - name: Test with Java 17 (Semeru)
         id: test-java17-semeru
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B
         continue-on-error: true
       
       - name: Publish test results - Java 17 (Semeru)
@@ -219,13 +216,13 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 8. Run tests with Java 21 (Temurin)
+      # 7. Run tests with Java 21 (Temurin)
       - name: Test with Java 21 (Temurin)
         id: test-java21-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       
       - name: Publish test results - Java 21 (Temurin)
@@ -244,13 +241,13 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 9. Run tests with Java 21 (Semeru)
+      # 8. Run tests with Java 21 (Semeru)
       - name: Test with Java 21 (Semeru)
         id: test-java21-semeru
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B
         continue-on-error: true
       
       - name: Publish test results - Java 21 (Semeru)
@@ -269,13 +266,13 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 10. Run tests with Java 25 (Temurin)
+      # 9. Run tests with Java 25 (Temurin)
       - name: Test with Java 25 (Temurin)
         id: test-java25-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       
       - name: Publish test results - Java 25 (Temurin)
@@ -294,13 +291,13 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 11. Run tests with Java 25 (Semeru)
+      # 10. Run tests with Java 25 (Semeru)
       - name: Test with Java 25 (Semeru)
         id: test-java25-semeru
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
+          mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B
         continue-on-error: true
       
       - name: Publish test results - Java 25 (Semeru)
@@ -319,7 +316,7 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 12. Check for test failures and fail job if any occurred
+      # 11. Check for test failures and fail job if any occurred
       - name: Check test results
         if: always()
         shell: bash

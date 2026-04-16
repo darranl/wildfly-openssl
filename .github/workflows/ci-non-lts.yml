@@ -27,10 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: windows-latest
-            vcvars: C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-            openssl_home: C:\Program Files\OpenSSL-Win64
     
     steps:
       # 1. Checkout code
@@ -57,25 +53,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       
-      # 3. Platform-specific OpenSSL setup
-      - name: OpenSSL Library Version Info (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: openssl version -v
-      
-      - name: OpenSSL Library Version Info (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          openssl version
-      
-      - name: Install OpenSSL 3 on Windows
-        if: matrix.os == 'windows-latest'
-        shell: powershell
-        run: |
-          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-          vcpkg install openssl:x64-windows-static-md
-      
-      # 4. Generate toolchains.xml
+      # 3. Generate toolchains.xml
       - name: Generate toolchains.xml
         shell: bash
         run: |
@@ -109,61 +87,19 @@ jobs:
             mv ~/.m2/toolchains.xml.tmp ~/.m2/toolchains.xml
           fi
       
-      # 5. Build with Java 26 (platform-specific)
-      - name: Build with Java 26 (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      # 4. Build wildfly-openssl Java code with Java 26
+      # Note: Native libraries (libwfssl) come from pre-built Maven artifacts (wildfly-openssl-natives)
+      - name: Build with Java 26
         shell: bash
         run: |
           export JAVA_HOME="${JAVA_HOME_26_TEMURIN}"
-          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-      
-      - name: Build with Java 26 (macOS)
-        if: matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          export JAVA_HOME="${JAVA_HOME_26_TEMURIN}"
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-      
-      - name: Build with Java 26 (Windows)
-        if: matrix.os == 'windows-latest'
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-          OPENSSL_HOME: ${{ matrix.openssl_home }}
-        shell: cmd
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
-          set JAVA_HOME=%JAVA_HOME_26_TEMURIN%
           mvn clean install -DskipTests -B -V
       
-      # 6. Test with Java 26 (platform-specific)
-      - name: Test with Java 26 (Temurin) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 5. Test with Java 26
+      - name: Test with Java 26 (Temurin)
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 26 (Temurin) - macOS
-        if: matrix.os == 'macos-latest'
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 26 (Temurin) - Windows
-        if: matrix.os == 'windows-latest'
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       

@@ -18,10 +18,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: windows-latest
-            vcvars: C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-            openssl_home: C:\Program Files\OpenSSL-Win64
     
     steps:
       # 1. Checkout code
@@ -97,25 +93,7 @@ jobs:
         shell: bash
         run: echo "JAVA_HOME_25_SEMERU=$JAVA_HOME" >> $GITHUB_ENV
       
-      # 3. Platform-specific OpenSSL setup
-      - name: OpenSSL Library Version Info (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: openssl version -v
-      
-      - name: OpenSSL Library Version Info (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          openssl version
-      
-      - name: Install OpenSSL 3 on Windows
-        if: matrix.os == 'windows-latest'
-        shell: powershell
-        run: |
-          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-          vcpkg install openssl:x64-windows-static-md
-      
-      # 4. Generate toolchains.xml
+      # 3. Generate toolchains.xml
       - name: Generate toolchains.xml
         shell: bash
         run: |
@@ -189,64 +167,20 @@ jobs:
           </toolchains>
           EOF
       
-      # 5. Build once with Java 25 (platform-specific)
-      - name: Build with Java 25 (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      # 4. Build wildfly-openssl Java code with Java 25
+      # Note: Native libraries (libwfssl) come from pre-built Maven artifacts (wildfly-openssl-natives)
+      - name: Build with Java 25
         shell: bash
         run: |
           export JAVA_HOME="${JAVA_HOME_25_TEMURIN}"
-          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-      
-      - name: Build with Java 25 (macOS)
-        if: matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          export JAVA_HOME="${JAVA_HOME_25_TEMURIN}"
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn clean install -DskipTests -B -V -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-      
-      - name: Build with Java 25 (Windows)
-        if: matrix.os == 'windows-latest'
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-          OPENSSL_HOME: ${{ matrix.openssl_home }}
-        shell: cmd
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
-          set JAVA_HOME=%JAVA_HOME_25_TEMURIN%
           mvn clean install -DskipTests -B -V
       
-      # 6. Run tests with Java 17 (Temurin)
-      - name: Test with Java 17 (Temurin) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 5. Run tests with Java 17 (Temurin)
+      - name: Test with Java 17 (Temurin)
         id: test-java17-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 17 (Temurin) - macOS
-        if: matrix.os == 'macos-latest'
-        id: test-java17-temurin
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 17 (Temurin) - Windows
-        if: matrix.os == 'windows-latest'
-        id: test-java17-temurin
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       
@@ -266,36 +200,12 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 7. Run tests with Java 17 (Semeru)
-      - name: Test with Java 17 (Semeru) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 6. Run tests with Java 17 (Semeru)
+      - name: Test with Java 17 (Semeru)
         id: test-java17-semeru
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 17 (Semeru) - macOS
-        if: matrix.os == 'macos-latest'
-        id: test-java17-semeru
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 17 (Semeru) - Windows
-        if: matrix.os == 'windows-latest'
-        id: test-java17-semeru
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B
         continue-on-error: true
       
@@ -315,36 +225,12 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 8. Run tests with Java 21 (Temurin)
-      - name: Test with Java 21 (Temurin) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 7. Run tests with Java 21 (Temurin)
+      - name: Test with Java 21 (Temurin)
         id: test-java21-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 21 (Temurin) - macOS
-        if: matrix.os == 'macos-latest'
-        id: test-java21-temurin
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 21 (Temurin) - Windows
-        if: matrix.os == 'windows-latest'
-        id: test-java21-temurin
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       
@@ -364,36 +250,12 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 9. Run tests with Java 21 (Semeru)
-      - name: Test with Java 21 (Semeru) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 8. Run tests with Java 21 (Semeru)
+      - name: Test with Java 21 (Semeru)
         id: test-java21-semeru
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 21 (Semeru) - macOS
-        if: matrix.os == 'macos-latest'
-        id: test-java21-semeru
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 21 (Semeru) - Windows
-        if: matrix.os == 'windows-latest'
-        id: test-java21-semeru
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B
         continue-on-error: true
       
@@ -413,36 +275,12 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 10. Run tests with Java 25 (Temurin)
-      - name: Test with Java 25 (Temurin) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 9. Run tests with Java 25 (Temurin)
+      - name: Test with Java 25 (Temurin)
         id: test-java25-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 25 (Temurin) - macOS
-        if: matrix.os == 'macos-latest'
-        id: test-java25-temurin
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 25 (Temurin) - Windows
-        if: matrix.os == 'windows-latest'
-        id: test-java25-temurin
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B
         continue-on-error: true
       
@@ -462,36 +300,12 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 11. Run tests with Java 25 (Semeru)
-      - name: Test with Java 25 (Semeru) - Linux
-        if: matrix.os == 'ubuntu-latest'
+      # 10. Run tests with Java 25 (Semeru)
+      - name: Test with Java 25 (Semeru)
         id: test-java25-semeru
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu
-        continue-on-error: true
-      
-      - name: Test with Java 25 (Semeru) - macOS
-        if: matrix.os == 'macos-latest'
-        id: test-java25-semeru
-        shell: bash
-        timeout-minutes: 30
-        run: |
-          export PATH="/usr/local/opt/openssl@3/bin:$PATH"
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B -Dorg.wildfly.openssl.path="/usr/local/opt/openssl@3/lib"
-        continue-on-error: true
-      
-      - name: Test with Java 25 (Semeru) - Windows
-        if: matrix.os == 'windows-latest'
-        id: test-java25-semeru
-        env:
-          VCVARS: ${{ matrix.vcvars }}
-        shell: cmd
-        timeout-minutes: 30
-        run: |
-          call "%VCVARS%" x64
-          set PATH=C:\vcpkg\installed\x64-windows\tools\openssl;%PATH%
           mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B
         continue-on-error: true
       
@@ -511,7 +325,7 @@ jobs:
           path: '**/target/surefire-reports/**'
           retention-days: 30
       
-      # 12. Check for test failures and fail job if any occurred
+      # 11. Check for test failures and fail job if any occurred
       - name: Check test results
         if: always()
         shell: bash
