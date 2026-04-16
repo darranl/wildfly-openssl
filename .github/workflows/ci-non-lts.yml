@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-15-intel]
     
     steps:
       # 1. Checkout code
@@ -93,14 +93,23 @@ jobs:
         shell: bash
         run: |
           export JAVA_HOME="${JAVA_HOME_26_TEMURIN}"
-          mvn clean install -DskipTests -B -V
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn clean install -DskipTests -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B -V
+          else
+            mvn clean install -DskipTests -B -V
+          fi
       
       # 5. Test with Java 26
       - name: Test with Java 26 (Temurin)
+        id: test-java26-temurin
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=26 -Djdk.test.vendor=temurin -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 26 (Temurin) - ${{ matrix.os }}
@@ -118,3 +127,24 @@ jobs:
           name: test-results-java26-temurin-${{ matrix.os }}
           path: '**/target/surefire-reports/**'
           retention-days: 30
+      
+      # 6. Check for test failures and fail job if any occurred
+      - name: Check test results
+        if: always()
+        shell: bash
+        run: |
+          echo "Checking test results..."
+          FAILED=0
+          
+          if [ "${{ steps.test-java26-temurin.outcome }}" != "success" ]; then
+            echo "❌ Java 26 (Temurin) tests failed"
+            FAILED=1
+          fi
+          
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "Test permutation failed. Check the test result artifacts and logs above."
+            exit 1
+          else
+            echo "✅ All tests passed"
+          fi

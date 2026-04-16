@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-15-intel]
     
     steps:
       # 1. Checkout code
@@ -173,7 +173,11 @@ jobs:
         shell: bash
         run: |
           export JAVA_HOME="${JAVA_HOME_25_TEMURIN}"
-          mvn clean install -DskipTests -B -V
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn clean install -DskipTests -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B -V
+          else
+            mvn clean install -DskipTests -B -V
+          fi
       
       # 5. Run tests with Java 17 (Temurin)
       - name: Test with Java 17 (Temurin)
@@ -181,7 +185,11 @@ jobs:
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=17 -Djdk.test.vendor=temurin -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 17 (Temurin) - ${{ matrix.os }}
@@ -206,7 +214,11 @@ jobs:
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=17 -Djdk.test.vendor=semeru -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 17 (Semeru) - ${{ matrix.os }}
@@ -231,7 +243,11 @@ jobs:
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=21 -Djdk.test.vendor=temurin -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 21 (Temurin) - ${{ matrix.os }}
@@ -256,7 +272,11 @@ jobs:
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=21 -Djdk.test.vendor=semeru -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 21 (Semeru) - ${{ matrix.os }}
@@ -281,7 +301,11 @@ jobs:
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=25 -Djdk.test.vendor=temurin -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 25 (Temurin) - ${{ matrix.os }}
@@ -306,7 +330,11 @@ jobs:
         shell: bash
         timeout-minutes: 30
         run: |
-          mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -Dorg.wildfly.openssl.path=/usr/lib/x86_64-linux-gnu -B
+          else
+            mvn test -Djdk.test.version=25 -Djdk.test.vendor=semeru -B
+          fi
         continue-on-error: true
       
       - name: Publish test results - Java 25 (Semeru) - ${{ matrix.os }}
